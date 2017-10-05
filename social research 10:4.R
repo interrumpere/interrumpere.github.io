@@ -9,7 +9,7 @@ Sys.setlocale("LC_ALL", 'en_US.UTF-8')
 #import population data
 #link to .ods file:http://ca.gov.taipei/public/Attachment/621617351230.ods
 tpe1040<-read_ods("~/Downloads/621617351230.ods",col_names = FALSE)
-tpe1<-tpe104[c("A", "G")] 
+tpe1<-tpe1040[c("A", "G")] 
 tpepop<-tpe1[c(5:16),] 
 colnames(tpepop)<-c("Location","Population")
 
@@ -98,6 +98,5 @@ rapegraph<- plot_ly(data, x = ~rapex, y = ~rapey, type = 'bar',
          xaxis = list(title = ""),
          yaxis = list(title = ""))
 
-#regress that!
-regression<-lm(rapepop$Rate~drugpop$Rate)
-summary(regression)
+#correlation?
+cor.test(drugpop$Rate,rapepop$Rate)
