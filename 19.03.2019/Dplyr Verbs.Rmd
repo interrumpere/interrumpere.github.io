@@ -1,0 +1,97 @@
+---
+title: "Dplyr Verb Practice"
+author: "andre"
+date: "3/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setlocale("LC_ALL", 'en_US.UTF-8')
+library(dplyr)
+library(readODS)
+library(knitr)
+```
+
+
+## Working With Verbs: 
+For this homework I'm going to be using the five major Dplyr verbs to manipulate some data downloaded from the Taipei Open Data portal. I'll be comparing three types of property crime in Taipei city: burglary, car thefts, and bicycle thefts. 
+
+For reference, the five verbs (with definitions taken from Davood Astaraky's [very informative guide](https://irgn452.files.wordpress.com/2017/05/dplyr-tutorial.pdf)) are:  
+1. **select()** , which returns a subset of the columns,  
+2. **filter()** , that is able to return a subset of the rows,  
+3. **arrange()** , that reorders the rows according to single or multiple variables,  
+4. **mutate()** , used to add columns from existing data,  
+5. **summarise()** , which reduces each group to a single row by calculating aggregate
+measures  
+The lesson on Data Camp also works with **group_by()**, so I'll be using that function as well!
+
+
+#Here's my data!  
+```{r data import}
+a<-read.csv(file="https://data.taipei/api/getDatasetInfo/downloadResource?id=68785231-d6c5-47a1-b001-77eec70bec02&rid=34a4a431-f04d-474a-8e72-8d3f586db3df",fileEncoding = "BIG5")
+b<-read.csv(file="https://data.taipei/api/getDatasetInfo/downloadResource?id=9717c017-f17c-4610-b6fe-e92181381538&rid=5928460b-ee8d-4323-b6ac-ad975dbb84c3",fileEncoding = "BIG5")
+c<-read.csv(file="https://data.taipei/api/getDatasetInfo/downloadResource?id=5c5e9e13-9803-47c0-bbd2-1a4b3c11c49b&rid=08052aba-d76d-4b25-93f7-e19cec685f5a",fileEncoding="BIG5")
+crimes<-rbind(a,b,c)
+
+crimes%>%group_by(案類)%>%summarise(number=n())
+
+```
+
+Much to my surprise, there are way more reported burglaries than any other crime during the same time frame. And I thought Taipei was safe!
+
+#Cleaning the data:
+Though the data from Taipei's website is already clean, there's a few changes I want to make: first of all, Chinese characters are difficult to work with in RStudio, so I'm going to change variable names to English. Next, I want to remove the entries that occur before 2015, and finally I'm going to change the location column to only contain the district and to ensure that only reports from Taipei City are considered (for some reason there are a few entries from Taoyuan and New Taipei.)
+```{r cleaning}
+names(crimes)<-c("Serial Number","Type","Date","Time","Location")
+#I don't need these columns
+crimes$`Serial Number`<-NULL 
+crimes$Time<-NULL
+#remove entries from before January 1st, 2015
+crimes<-filter(crimes, Date>=1040101)
+#districts only
+crimes$Location<-strtrim(crimes$Location, 12)
+crimes$Location<-gsub(crimes$Location,pattern = "台北市",replacement = "")
+crimes<-filter(crimes, grepl('區',crimes$Location))
+crimes <- crimes[-c(2471),] #remove the one observation from Taichung(?)
+crimes%>%group_by(Location)%>%summarise(Number=n() )%>%arrange(desc(Number))%>% {. ->> crimesFreq}
+crimesFreq
+```
+
+#Conclusion?
+So it looks like Daan and Beitou have the highest rate of property crime, but is that true? To be sure, I need to check the population for each district and calculate the rate per 100,000. 
+
+```{r population and crime rate, message=FALSE }
+library(readODS)
+#sorce for population file: https://data.taipei/dataset/detail/metadata?id=6a1dbb4e-e99c-4e67-ab09-f6d83852dc99
+population<-read_ods(path='~/Desktop/pop_file.ods')
+population$里數village<-NULL
+population$鄰數neighborhood<-NULL
+population$戶數household<-NULL
+names(population)<-c("Location","Population")
+
+#make format match crimeFreq DT
+population$Location<-trimws(population$Location,which=c("both"))
+population <- population[-c(14,1),]#remove empty col
+population$Location<-paste0(population$Location,"區")
+
+#merge
+popCrimes<-left_join(x = crimesFreq, y = population,by="Location")
+
+#function to calculate crime rate
+crimerate<-function(x,y) {
+  small<- x/y
+  big<-small*100000
+final<-round(big,digits = 3)
+  return(final)
+}
+
+mutate(popCrimes,per100000=crimerate(popCrimes$Number,popCrimes$Population))%>%arrange(desc(per100000))%>% {. ->> popCrimes}
+popCrimes
+```
+#Conclusion!
+Comparing these two tables, we can see that the **number** of reported crimes is very different from the **crime rate**. I guess this is a reminder that you can't take statistics at face value, because the statment "Daan district has the most property crime" is really only *technically* true. The more you know!
+```{r tables, results='asis', echo=FALSE}
+kable(popCrimes,caption="Property crimes per 100,000")
+kable(crimesFreq,caption="Number of property crimes by district.")
+```
