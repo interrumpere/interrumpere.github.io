@@ -64,12 +64,14 @@ urls_df$url_list<-paste(c("http://boards.4chan.org/"),urls_df$url_list,sep='')
 fourchantext_1<-sapply(urls_df$url_list,getContent,'.postMessage')
 #corpuses
 clean_chan<-InputToCorpus(fourchantext_1)
-#remove for final#
-clean_chan<-InputToCorpus('~/D')
 clean_chan<-tm_map(clean_chan,removeWords,drop_Words)
 chan_one<-TermDocumentMatrix(clean_chan)
 chan_one_sparse <- removeSparseTerms(chan_one, 0.99)
 ####text mining####
+#user inputs
+userURL<-c("input a url")
+userNode<-c("input a node")
+userTerm<-c("input a term")
 #get DF
 userDF<-getContent(userURL,userNode)
 #check DF
